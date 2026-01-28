@@ -1,0 +1,5 @@
+Nome: copilot-MCP-suporte-offshore
+Token: sbp_b8fe439c8beb9dae52d1b4a45985c33d83177e86
+Project ID: bxjjgbnbiyxpnauiiniy
+anon public: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ4ampnYm5iaXl4cG5hdWlpbml5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzNDI4NDksImV4cCI6MjA3OTkxODg0OX0.G4qO8N2t8i9A9F-goOzfJgB3CCgveC9e_XvEByoQB-Y
+url : https://bxjjgbnbiyxpnauiiniy.supabase.co

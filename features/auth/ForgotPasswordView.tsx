@@ -1,0 +1,90 @@
+import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { supabase } from '../../lib/supabase';
+import { Button, Input, Label, FormItem, FormMessage, Card, CardContent, CardHeader, CardTitle, CardFooter } from '../../components/ui';
+import { ArrowLeft } from 'lucide-react';
+import { toast } from '../../components/ui/Toaster';
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email("E-mail inválido"),
+});
+
+type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
+
+interface ForgotPasswordViewProps {
+  onBack: () => void;
+}
+
+export const ForgotPasswordView: React.FC<ForgotPasswordViewProps> = ({ onBack }) => {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const { register, handleSubmit, formState: { errors } } = useForm<ForgotPasswordFormData>({
+    resolver: zodResolver(forgotPasswordSchema)
+  });
+
+  const onSubmit = async (data: ForgotPasswordFormData) => {
+    setIsLoading(true);
+    try {
+      // Redireciona de volta para a origem da app (ou valor de ambiente)
+      const redirectTo = (import.meta as any)?.env?.VITE_PASSWORD_RESET_REDIRECT_URL || window.location.origin;
+      const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
+        redirectTo
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast("Link de recuperação enviado! Verifique seu e-mail.", "success");
+      
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+      toast(error.message || "Erro ao enviar e-mail de recuperação.", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Card className="w-full max-w-md mx-auto shadow-lg animate-in fade-in zoom-in duration-500 bg-white border-slate-200">
+      <CardHeader className="text-center pb-2">
+        <CardTitle className="text-2xl font-bold text-slate-900 mb-2">Recuperar Senha</CardTitle>
+        <p className="text-sm text-slate-500">
+          Digite seu e-mail e enviaremos um link para você redefinir sua senha.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <FormItem>
+            <Label htmlFor="email">E-mail</Label>
+            <Input 
+              id="email" 
+              type="email" 
+              placeholder="seu@email.com" 
+              {...register("email")} 
+            />
+            <FormMessage message={errors.email?.message} />
+          </FormItem>
+
+          <Button 
+            type="submit" 
+            className="w-full mt-4 h-11 text-base"
+            disabled={isLoading}
+          >
+            {isLoading ? "Enviando..." : "Enviar Link"}
+          </Button>
+        </form>
+      </CardContent>
+      <CardFooter className="flex justify-center pb-8">
+        <button 
+          onClick={onBack} 
+          className="flex items-center text-sm text-slate-500 hover:text-slate-900 transition-colors gap-2"
+        >
+          <ArrowLeft size={16} /> Voltar para Login
+        </button>
+      </CardFooter>
+    </Card>
+  );
+};

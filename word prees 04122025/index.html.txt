@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suporte Offshore</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --background-color: #000000;
+            --primary-color: #22C55E;
+            --primary-hover-color: #16a34a; /* NOVO: Cor para o hover do botão */
+            --primary-dark-color: #072913; /* Cor para o clique do botão */
+            --success-color: #22C55E;
+            --user-message-bg: rgba(34, 197, 94, 0.15);
+            --bot-message-bg: #1E1E1E;
+            --text-color: #E5E7EB;
+            --border-color: #22C55E;
+            --input-bg: #111827;
+            --disabled-color: #4B5563;
+            --error-color: #ef4444;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: var(--background-color); color: var(--text-color); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; overflow: hidden; }
+        
+        #login-view, #register-view, #chat-view { display: none; }
+        body[data-view="login"] #login-view { display: flex; }
+        body[data-view="register"] #register-view { display: flex; }
+        body[data-view="chat"] #chat-view { display: flex; }
+        
+        .auth-container { height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 10px; }
+        .auth-form-wrapper { width: 100%; max-width: 380px; padding: 40px; background-color: var(--bot-message-bg); border: 1px solid var(--border-color); border-radius: 10px; }
+        .auth-form h2 { color: var(--primary-color); margin-bottom: 20px; text-align: center; }
+        .auth-form .input-group { position: relative; margin-bottom: 15px; }
+        .auth-form label { display: block; margin-bottom: 5px; font-size: 14px; }
+        .auth-form input { width: 100%; padding: 10px; background-color: var(--input-bg); border: 1px solid var(--border-color); border-radius: 5px; color: var(--text-color); font-size: 16px; }
+        .auth-form input[type="password"] { padding-right: 40px; }
+        .auth-form button { width: 100%; padding: 12px; background-color: var(--primary-color); border: none; border-radius: 5px; color: var(--background-color); font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: background-color 0.2s, transform 0.1s; }
+        .auth-form button:disabled { background-color: var(--disabled-color); cursor: not-allowed; }
+        /* NOVO: Efeito HOVER para os botões de formulário */
+        .auth-form button:hover:not(:disabled) { background-color: var(--primary-hover-color); }
+        .auth-form button:active { background-color: var(--primary-dark-color); transform: scale(0.98); }
+        .auth-message { text-align: center; min-height: 20px; margin-top: 15px; font-size: 14px; }
+        .auth-message.error { color: var(--error-color); }
+        .auth-message.success { color: var(--success-color); }
+        .toggle-auth { text-align: center; margin-top: 20px; font-size: 14px; }
+        .toggle-auth a { color: var(--primary-color); cursor: pointer; text-decoration: underline; font-weight: bold; }
+
+        .password-toggle-icon { position: absolute; top: 50%; right: 10px; transform: translateY(-50%); cursor: pointer; padding-top: 20px; color: var(--primary-color); }
+        .password-toggle-icon svg { width: 20px; height: 20px; }
+        .password-toggle-icon .eye-slash-icon { display: none; }
+        .password-feedback { font-size: 12px; min-height: 15px; margin-top: -10px; margin-bottom: 10px; text-align: left; padding-left: 2px; }
+        .password-feedback.invalid { color: var(--error-color); }
+        .password-feedback.valid { color: var(--success-color); }
+
+        #chat-view { flex-direction: column; height: 100vh; width: 100%; }
+        .chat-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; border-bottom: 1px solid var(--border-color); }
+        #welcome-message { font-size: 16px; }
+        #chat-username-display { color: var(--primary-color); font-weight: bold; }
+        
+        .header-buttons { display: flex; align-items: center; gap: 10px; }
+        #clear-chat-button { background: none; border: 1px solid var(--primary-color); color: var(--primary-color); padding: 5px; border-radius: 5px; cursor: pointer; transition: background-color 0.2s, transform 0.1s; display: flex; align-items: center; justify-content: center; }
+        #clear-chat-button svg { width: 20px; height: 20px; }
+        #clear-chat-button:hover { background-color: rgba(34, 197, 94, 0.1); }
+        #clear-chat-button:active { background-color: rgba(34, 197, 94, 0.2); transform: scale(0.98); }
+        #logout-button { background: none; border: 1px solid var(--error-color); color: var(--error-color); padding: 5px 10px; border-radius: 5px; cursor: pointer; transition: background-color 0.2s, transform 0.1s; }
+        #logout-button:hover { background-color: rgba(239, 68, 68, 0.1); }
+        #logout-button:active { background-color: rgba(239, 68, 68, 0.2); transform: scale(0.98); }
+        
+        .message-list { flex-grow: 1; overflow-y: auto; padding: 20px; padding-bottom: 160px; }
+        
+        .message-wrapper { display: flex; margin-bottom: 15px; max-width: 80%; align-items: flex-end; }
+        .message-wrapper.user { margin-left: auto; flex-direction: row-reverse; }
+        .message-wrapper.bot { margin-right: auto; }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; background-color: var(--bot-message-bg); color: var(--primary-color); display: flex; align-items: center; justify-content: center; font-weight: bold; margin: 0 10px; flex-shrink: 0; }
+        .message-bubble { padding: 12px 18px; border-radius: 18px; word-wrap: break-word; max-width: 100%; white-space: pre-wrap; }
+        .message-bubble.user { background-color: var(--user-message-bg); border: 1px solid var(--primary-color); color: var(--text-color); border-bottom-right-radius: 4px; }
+        .message-bubble.bot { background-color: var(--bot-message-bg); border-bottom-left-radius: 4px; }
+        .chat-input-area { position: fixed; bottom: 0; left: 0; right: 0; background-color: var(--background-color); border-top: 1px solid var(--border-color); padding: 10px 20px; display: flex; flex-direction: column; align-items: center; }
+        #file-preview { width: 100%; max-width: 800px; margin-bottom: 8px; display: none; justify-content: space-between; align-items: center; background-color: var(--input-bg); padding: 5px 10px; border-radius: 8px; font-size: 14px; color: var(--text-color); }
+        .chat-input-form { width: 100%; }
+        .input-wrapper { display: flex; align-items: center; width: 100%; max-width: 800px; margin: 0 auto; background-color: var(--input-bg); border: 1px solid var(--border-color); border-radius: 25px; padding: 5px; }
+        #message-input { flex-grow: 1; border: none; background: transparent; color: var(--text-color); padding: 10px 15px; font-size: 16px; outline: none; max-height: 120px; overflow-y: auto; resize: none; }
+        #file-input { display: none; }
+        .icon-button { background: transparent; border: none; color: var(--primary-color); cursor: pointer; padding: 10px; display: flex; align-items: center; justify-content: center; transition: color 0.2s, transform 0.1s; }
+        /* NOVO: Efeito HOVER para os botões de ícone */
+        .icon-button:hover:not(:disabled) { color: var(--primary-hover-color); }
+        .icon-button:active { color: var(--primary-dark-color); transform: scale(0.9); }
+        .icon-button svg { width: 22px; height: 22px; stroke: currentColor; }
+        .typing-indicator { display: flex; align-items: center; height: 17px; }
+        .typing-indicator span { height: 8px; width: 8px; margin: 0 2px; background-color: var(--primary-color); border-radius: 50%; display: inline-block; animation: bob 1.4s infinite ease-in-out both; }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bob { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
+    </style>
+</head>
+<body data-view="login">
+
+    <!-- O resto do seu HTML permanece exatamente o mesmo, pois a mudança é apenas no CSS. -->
+    
+    <!-- TELA DE LOGIN -->
+    <div id="login-view" class="auth-container">
+        <div class="auth-form-wrapper">
+            <form class="auth-form" id="login-form">
+                <h2>Faça seu Login</h2>
+                <div class="input-group">
+                    <label for="login-email">E-mail</label>
+                    <input type="email" id="login-email" required autocomplete="username">
+                </div>
+                <div class="input-group">
+                    <label for="login-password">Senha</label>
+                    <input type="password" id="login-password" required autocomplete="current-password">
+                    <span class="password-toggle-icon" id="login-password-toggle">
+                        <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        <svg class="eye-slash-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path><line x1="2" x2="22" y1="2" y2="22"></line></svg>
+                    </span>
+                </div>
+                <button type="submit">Entrar</button>
+                <p id="login-error" class="auth-message error"></p>
+                <div class="toggle-auth">
+                    Não tem uma conta? <a id="link-to-register">Cadastre-se</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- TELA DE CADASTRO -->
+    <div id="register-view" class="auth-container">
+        <div class="auth-form-wrapper">
+            <form class="auth-form" id="register-form">
+                <h2>Crie sua Conta</h2>
+                <div class="input-group">
+                    <label for="register-fullname">Nome Completo</label>
+                    <input type="text" id="register-fullname" name="fullname" required>
+                </div>
+                <div class="input-group">
+                    <label for="register-email">E-mail</label>
+                    <input type="email" id="register-email" name="email" required>
+                </div>
+                <div class="input-group">
+                    <label for="register-password">Senha</label>
+                    <input type="password" id="register-password" name="password" required>
+                    <span class="password-toggle-icon" id="register-password-toggle">
+                        <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        <svg class="eye-slash-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path><line x1="2" x2="22" y1="2" y2="22"></line></svg>
+                    </span>
+                </div>
+                <div class="input-group">
+                    <label for="register-password-confirm">Confirmar Senha</label>
+                    <input type="password" id="register-password-confirm" required>
+                     <span class="password-toggle-icon" id="register-password-confirm-toggle">
+                        <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        <svg class="eye-slash-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path><line x1="2" x2="22" y1="2" y2="22"></line></svg>
+                    </span>
+                </div>
+                <div id="password-requirements" class="password-feedback"></div>
+                
+                <button type="submit">Cadastrar</button>
+                <p id="register-message" class="auth-message"></p>
+                <div class="toggle-auth">
+                    Já tem uma conta? <a id="link-to-login">Faça login</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- TELA DE CHAT -->
+    <div id="chat-view">
+        <div class="chat-header">
+            <div id="welcome-message">Bem-vindo, <span id="chat-username-display"></span>!</div>
+            <div class="header-buttons">
+                <button id="clear-chat-button" title="Limpar conversa">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg>
+                </button>
+                <button id="logout-button">Sair</button>
+            </div>
+        </div>
+        <div class="message-list" id="message-list"></div>
+        <div class="chat-input-area">
+            <div id="file-preview"></div>
+            <form class="chat-input-form" id="chat-form">
+                <input id="file-input" type="file" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,text/plain"/>
+                <div class="input-wrapper">
+                    <button type="button" class="icon-button" id="attach-file-button" aria-label="Anexar arquivo"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg></button>
+                    <textarea id="message-input" placeholder="Digite sua mensagem..." rows="1"></textarea>
+                    <button type="submit" class="icon-button" id="send-button" aria-label="Enviar mensagem"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- O Script Javascript permanece o mesmo da versão anterior, pois a lógica não mudou -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- CONFIGURAÇÕES GERAIS ---
+            const webhookUrl = 'https://n8n-webhook.2yhtoy.easypanel.host/webhook/robo'; //neriton; fluxo: investors trust  - "https://webhook.flapinvest.com.br/webhook/robo" ,hostinger ; fluxo:  investors trust - "https://n8n-webhook.2yhtoy.easypanel.host/webhook/robo"
+            const registrationWebhookUrl = 'https://n8n-webhook.2yhtoy.easypanel.host/webhook/1'; // neriton; fluxo de cadastro - "https://webhook.flapinvest.com.br/webhook/1" ,hostinger ; fluxo de cadastro  - "https://n8n-webhook.2yhtoy.easypanel.host/webhook/1"
+            const SUPABASE_URL = 'https://hafmslcycauviesiebvq.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhZm1zbGN5Y2F1dmllc2llYnZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTEzNzc5NDEsImV4cCI6MjA2Njk1Mzk0MX0.sTHU2Ht69x_hvbdQewGMnUzNH39O1rD2jFvrjjh7_Xo';
+            const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            let currentUser = null;
+            let isLoading = false;
+            let stagedFile = null;
+
+            // --- ELEMENTOS DO DOM ---
+            const loginForm = document.getElementById('login-form');
+            const loginEmailInput = document.getElementById('login-email');
+            const loginPasswordInput = document.getElementById('login-password');
+            const loginPasswordToggle = document.getElementById('login-password-toggle');
+            const loginError = document.getElementById('login-error');
+            const registerForm = document.getElementById('register-form');
+            const registerEmailInput = document.getElementById('register-email');
+            const registerPasswordInput = document.getElementById('register-password');
+            const registerPasswordToggle = document.getElementById('register-password-toggle');
+            const registerPasswordConfirmInput = document.getElementById('register-password-confirm');
+            const registerPasswordConfirmToggle = document.getElementById('register-password-confirm-toggle');
+            const passwordRequirements = document.getElementById('password-requirements');
+            const registerMessage = document.getElementById('register-message');
+            const registerSubmitButton = registerForm.querySelector('button');
+            const linkToRegister = document.getElementById('link-to-register');
+            const linkToLogin = document.getElementById('link-to-login');
+            const logoutButton = document.getElementById('logout-button');
+            const chatForm = document.getElementById('chat-form');
+            const messageInput = document.getElementById('message-input');
+            const messageList = document.getElementById('message-list');
+            const attachFileButton = document.getElementById('attach-file-button');
+            const fileInput = document.getElementById('file-input');
+            const sendButton = document.getElementById('send-button');
+            const filePreview = document.getElementById('file-preview');
+            const chatUsernameDisplay = document.getElementById('chat-username-display');
+            const clearChatButton = document.getElementById('clear-chat-button');
+            
+            // --- LÓGICA DE VISUALIZAR SENHA ---
+            const togglePasswordVisibility = (input, toggle) => {
+                const isPassword = input.type === 'password';
+                input.type = isPassword ? 'text' : 'password';
+                toggle.querySelector('.eye-icon').style.display = isPassword ? 'none' : 'block';
+                toggle.querySelector('.eye-slash-icon').style.display = isPassword ? 'block' : 'none';
+            };
+            loginPasswordToggle.addEventListener('click', () => togglePasswordVisibility(loginPasswordInput, loginPasswordToggle));
+            registerPasswordToggle.addEventListener('click', () => togglePasswordVisibility(registerPasswordInput, registerPasswordToggle));
+            registerPasswordConfirmToggle.addEventListener('click', () => togglePasswordVisibility(registerPasswordConfirmInput, registerPasswordConfirmToggle));
+
+            // --- LÓGICA DE VALIDAÇÃO DE SENHA EM TEMPO REAL ---
+            const validatePassword = () => {
+                const pass = registerPasswordInput.value;
+                const confirmPass = registerPasswordConfirmInput.value;
+                const specialCharRegex = /[!@#$%¨&*]/;
+                if (!pass && !confirmPass) { passwordRequirements.textContent = ''; return { isValid: false, message: '' }; }
+                if (pass.length < 8) { passwordRequirements.className = 'password-feedback invalid'; passwordRequirements.textContent = 'A senha deve ter no mínimo 8 caracteres.'; return { isValid: false, message: passwordRequirements.textContent }; }
+                if (pass.length > 16) { passwordRequirements.className = 'password-feedback invalid'; passwordRequirements.textContent = 'A senha deve ter no máximo 16 caracteres.'; return { isValid: false, message: passwordRequirements.textContent }; }
+                if (!specialCharRegex.test(pass)) { passwordRequirements.className = 'password-feedback invalid'; passwordRequirements.textContent = 'Deve conter um caractere especial (!@#$%¨&*).'; return { isValid: false, message: passwordRequirements.textContent }; }
+                if (confirmPass && pass !== confirmPass) { passwordRequirements.className = 'password-feedback invalid'; passwordRequirements.textContent = 'As senhas não coincidem.'; return { isValid: false, message: passwordRequirements.textContent }; }
+                passwordRequirements.className = 'password-feedback valid';
+                passwordRequirements.textContent = '✓ Senha válida!';
+                return { isValid: true, message: '' };
+            };
+            registerPasswordInput.addEventListener('input', validatePassword);
+            registerPasswordConfirmInput.addEventListener('input', validatePassword);
+
+            // --- NAVEGAÇÃO E SESSÃO ---
+            const switchView = (viewName) => { document.body.dataset.view = viewName; };
+            linkToRegister.addEventListener('click', (e) => { e.preventDefault(); switchView('register'); });
+            linkToLogin.addEventListener('click', (e) => { e.preventDefault(); switchView('login'); });
+            const login = (user) => { currentUser = user; sessionStorage.setItem('chat_currentUser', JSON.stringify(user)); chatUsernameDisplay.textContent = user.username; switchView('chat'); };
+            const logout = () => { currentUser = null; sessionStorage.removeItem('chat_currentUser'); messageList.innerHTML = ''; chatUsernameDisplay.textContent = ''; switchView('login'); };
+            logoutButton.addEventListener('click', logout);
+
+            // --- LÓGICA DE LIMPAR CHAT ---
+            clearChatButton.addEventListener('click', () => {
+                if (messageList.innerHTML.trim() === '') return;
+                if (confirm('Tem certeza de que deseja limpar a conversa? Esta ação não pode ser desfeita.')) {
+                    messageList.innerHTML = '';
+                }
+            });
+
+            // --- LÓGICA DE LOGIN ---
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                loginError.textContent = '';
+                const email = loginEmailInput.value;
+                const password = loginPasswordInput.value;
+                if (!email || !password) { loginError.textContent = 'Por favor, preencha email e senha.'; return; }
+                try {
+                    const encodedPassword = btoa(password);
+                    const { data, error } = await supabaseClient.from('cadastro').select('email, nome').eq('email', email).eq('senha', encodedPassword).single();
+                    if (error && error.code !== 'PGRST116') throw error;
+                    if (data) { login({ id: data.email, username: data.nome }); } 
+                    else { loginError.textContent = 'Email ou senha inválidos.'; }
+                } catch (error) {
+                    console.error("Erro no login:", error);
+                    loginError.textContent = 'Ocorreu um erro ao tentar fazer login.';
+                }
+            });
+
+            // --- LÓGICA DE CADASTRO ---
+            registerForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                registerMessage.textContent = '';
+                registerMessage.className = 'auth-message';
+                const passwordValidation = validatePassword();
+                if (!passwordValidation.isValid) { registerMessage.classList.add('error'); registerMessage.textContent = passwordValidation.message || 'Por favor, corrija os erros na senha.'; return; }
+                registerSubmitButton.disabled = true;
+                registerSubmitButton.textContent = 'Verificando...';
+                const email = registerEmailInput.value;
+                try {
+                    const { data: existingUser, error: checkError } = await supabaseClient.from('cadastro').select('email').eq('email', email).single();
+                    if (checkError && checkError.code !== 'PGRST116') throw checkError; 
+                    if (existingUser) {
+                        registerMessage.classList.add('error');
+                        registerMessage.textContent = 'Este e-mail já possui cadastro.';
+                        registerSubmitButton.disabled = false;
+                        registerSubmitButton.textContent = 'Cadastrar';
+                        return;
+                    }
+                    registerSubmitButton.textContent = 'Enviando...';
+                    const formData = new FormData(registerForm);
+                    const finalUrl = `${registrationWebhookUrl}?${new URLSearchParams(formData).toString()}`;
+                    const response = await fetch(finalUrl, { method: 'GET' });
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        registerMessage.classList.add('success');
+                        registerMessage.textContent = data.mensagem + ' Redirecionando...';
+                        registerForm.reset();
+                        passwordRequirements.textContent = '';
+                        setTimeout(() => { switchView('login'); }, 2500);
+                    } else {
+                        registerMessage.classList.add('error');
+                        registerMessage.textContent = data.mensagem;
+                    }
+                } catch (err) {
+                    console.error('Erro no processo de cadastro:', err);
+                    registerMessage.classList.add('error');
+                    registerMessage.textContent = 'Erro de comunicação. Tente novamente.';
+                } finally {
+                    if (registerMessage.textContent.indexOf('Redirecionando...') === -1) {
+                         registerSubmitButton.disabled = false;
+                         registerSubmitButton.textContent = 'Cadastrar';
+                    }
+                }
+            });
+
+            // --- LÓGICA DO CHAT ---
+            const formatAndSanitizeReply = (text) => { if (!text) return ""; let cleanedText = text.replace(/【.*?】/g, ''); cleanedText = cleanedText.replace(/\\n/g, '<br>'); return cleanedText.trim(); };
+            const showTypingIndicator = (show) => { let indicator = document.getElementById('typing-indicator'); if (show) { if (indicator) return; const wrapper = document.createElement('div'); wrapper.id = 'typing-indicator'; wrapper.className = 'message-wrapper bot'; wrapper.innerHTML = `<div class="avatar">R</div><div class="message-bubble bot"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`; messageList.appendChild(wrapper); messageList.scrollTop = messageList.scrollHeight; } else { if (indicator) indicator.remove(); } };
+            const addMessage = (htmlContent, sender) => { const messageWrapper = document.createElement('div'); messageWrapper.className = `message-wrapper ${sender}`; const avatar = document.createElement('div'); avatar.className = 'avatar'; avatar.textContent = sender === 'user' ? currentUser.username.charAt(0).toUpperCase() : 'R'; const messageBubble = document.createElement('div'); messageBubble.className = `message-bubble ${sender}`; messageBubble.innerHTML = htmlContent; messageWrapper.appendChild(avatar); messageWrapper.appendChild(messageBubble); messageList.appendChild(messageWrapper); messageList.scrollTop = messageList.scrollHeight; };
+            const triggerWebhook = async (payloadData) => { toggleInputs(true); showTypingIndicator(true); const payload = { user_id: currentUser.id, ...payloadData, timestamp: new Date().toISOString() }; try { const response = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); if (!response.ok) throw new Error(`Erro na requisição: ${response.statusText}`); const responseData = await response.json(); const rawReply = responseData.reply || "Recebido, mas sem resposta formatada."; const finalHtml = formatAndSanitizeReply(rawReply); addMessage(finalHtml, 'bot'); } catch (error) { console.error("Erro ao chamar o webhook:", error); addMessage("Desculpe, ocorreu um erro de comunicação.", 'bot'); } finally { showTypingIndicator(false); toggleInputs(false); } };
+            chatForm.addEventListener('submit', async (e) => { e.preventDefault(); if (!currentUser || (messageInput.value.trim() === '' && !stagedFile)) return; const messageText = messageInput.value.trim(); const payloadData = { message: messageText }; let uiMessageHtml = messageText.replace(/\n/g, '<br>'); if (stagedFile) { try { payloadData.file_content_base64 = await readFileAsBase64(stagedFile); payloadData.file_type = stagedFile.type; payloadData.file_name = stagedFile.name; uiMessageHtml += `<br><br><em style="font-size: 0.9em; color: #a1a1aa;">Anexado: ${stagedFile.name}</em>`; } catch (error) { addMessage("Erro ao ler o arquivo.", 'bot'); return; } } addMessage(uiMessageHtml, 'user'); triggerWebhook(payloadData); messageInput.value = ''; clearStagedFile(); resetTextareaHeight(); });
+            const toggleInputs = (disabled) => { isLoading = disabled; messageInput.disabled = disabled; sendButton.disabled = disabled || (messageInput.value.trim() === '' && !stagedFile); attachFileButton.disabled = disabled; fileInput.disabled = disabled; };
+            const readFileAsBase64 = (file) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result.split(',')[1]); reader.onerror = (error) => reject(error); reader.readAsDataURL(file); });
+            const clearStagedFile = () => { stagedFile = null; fileInput.value = null; filePreview.innerHTML = ''; filePreview.style.display = 'none'; toggleInputs(isLoading); };
+            const resetTextareaHeight = () => { messageInput.style.height = 'auto'; };
+            fileInput.addEventListener('change', (e) => { const file = e.target.files[0]; if (!file) return; stagedFile = file; filePreview.style.display = 'flex'; filePreview.innerHTML = `<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${stagedFile.name}</span><button id="remove-file-button" type="button" style="background:none;border:none;color:var(--error-color);cursor:pointer;font-size:20px;margin-left:10px;">×</button>`; document.getElementById('remove-file-button').addEventListener('click', clearStagedFile); toggleInputs(isLoading); });
+            messageInput.addEventListener('input', () => { toggleInputs(isLoading); resetTextareaHeight(); messageInput.style.height = `${messageInput.scrollHeight}px`; });
+            messageInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chatForm.dispatchEvent(new Event('submit', { cancelable: true })); } });
+            attachFileButton.addEventListener('click', () => fileInput.click());
+
+            // --- INICIALIZAÇÃO ---
+            const sessionUser = sessionStorage.getItem('chat_currentUser');
+            if (sessionUser) { login(JSON.parse(sessionUser)); } 
+            else { switchView('login'); }
+            clearStagedFile();
+        });
+    </script>
+</body>
+</html>

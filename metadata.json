@@ -1,0 +1,5 @@
+{
+  "name": "suporte offshore",
+  "description": "A modern, multi-step onboarding wizard for Suporte Offshore using React, Tailwind, and Supabase.",
+  "requestFramePermissions": []
+}
